@@ -51,7 +51,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.4.0"
+local VERSION = "0.4.1"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -300,8 +300,10 @@ end
 local function updateText()
     local u = db().update
     if u and older(VERSION, u.version) then
+        local note = u.note or ""
+        if note ~= "" and not string.find(note, "[%.!?]$") then note = note .. "." end
         return string.format("Guide %s is out (you have %s)%s", u.version, VERSION,
-            (u.note and u.note ~= "") and (": " .. u.note) or ".")
+            note ~= "" and (": " .. note) or ".")
     end
     db().update = nil          -- installed, or never newer
     return nil
@@ -414,7 +416,7 @@ handlers.Q = function() hello() end
 handlers.U = function(f)
     if not older(VERSION, f[2]) then return end
     db().update = { version = f[2], note = f[3] or "" }
-    say("|cffff8040" .. updateText() .. "|r Copy the new Guide folder into Interface\\AddOns, then /reload.")
+    say("|cffff8040" .. string.gsub(updateText(), "^Guide ", "version ", 1) .. "|r Copy the new Guide folder into Interface\\AddOns, then /reload.")
     if panel:IsShown() then refreshPanel() end
 end
 
@@ -428,7 +430,7 @@ events:SetScript("OnEvent", function(self, event, prefix, msg, channel, sender)
         if p then frame:ClearAllPoints(); frame:SetPoint(p[1], UIParent, p[2], p[3], p[4]) end
         placeButton()
         for _, n in ipairs(db().notes) do addNote(n[2], n[1]) end
-        if updateText() then say("|cffff8040" .. updateText() .. "|r") end
+        if updateText() then say("|cffff8040" .. string.gsub(updateText(), "^Guide ", "version ", 1) .. "|r") end
         return
     end
     if event == "PLAYER_ENTERING_WORLD" then
