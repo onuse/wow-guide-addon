@@ -217,12 +217,16 @@ end)
 local panel = CreateFrame("Frame", "GuidePanel", UIParent)
 panel:SetWidth(340); panel:SetHeight(300)
 panel:SetPoint("RIGHT", UIParent, "RIGHT", -60, 40)
+-- A plain dark fill under the dialog border: the stock dialog background is
+-- see-through enough that small text was hard to read over bright Booty Bay
+-- wood (mele's test, 2026-10-10).
 panel:SetBackdrop({
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-    tile = true, tileSize = 32, edgeSize = 32,
+    tile = true, tileSize = 16, edgeSize = 32,
     insets = { left = 11, right = 12, top = 12, bottom = 11 },
 })
+panel:SetBackdropColor(0.05, 0.05, 0.07, 0.9)
 panel:SetMovable(true); panel:EnableMouse(true); panel:RegisterForDrag("LeftButton")
 panel:SetScript("OnDragStart", panel.StartMoving)
 panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
@@ -258,7 +262,7 @@ notes:SetFontObject(GameFontHighlightSmall)
 notes:SetJustifyH("LEFT")
 notes:SetFading(false)
 notes:SetMaxLines(MAX_NOTES)
-notes:SetInsertMode("BOTTOM")
+notes:SetInsertMode("TOP")     -- newest first, from the top: a short log does not sit in an empty well
 notes:EnableMouseWheel(true)
 notes:SetScript("OnMouseWheel", function(self, delta)
     if delta > 0 then self:ScrollUp() else self:ScrollDown() end
