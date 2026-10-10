@@ -32,6 +32,15 @@ Wire format (prefix "Guide", tab-separated):
   X <reason>         stopped
   N <text>           a note for the panel
   T <text>           test
+  U <version> <note> a newer Guide is out: the panel and chat say so
+  Q                  say hello again
+
+And back, to the server:
+  H <version>        hello, on entering the world and on Q. Whispered to
+                     yourself, so it works whether Claude is online or not;
+                     the server reads it on the way past. This is how Claude
+                     knows which version you run, and sees when an update
+                     has been installed.
 
 /guide          the Claude panel
 /guide arrow    big arrow on/off
@@ -40,6 +49,9 @@ Wire format (prefix "Guide", tab-separated):
 ]]
 
 local PREFIX, TRUSTED = "Guide", "Claude"
+-- Here, not only in the .toc: the client reads a .toc once, at start, so after
+-- a /reload over new files GetAddOnMetadata would still give the old version.
+local VERSION = "0.4.0"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -241,6 +253,11 @@ title:SetText("Claude")
 local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", -6, -6)
 
+local updateLine = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+updateLine:SetPoint("BOTTOMLEFT", 22, 16)     -- under the notes; wraps upwards
+updateLine:SetWidth(296); updateLine:SetJustifyH("LEFT")
+updateLine:SetTextColor(1, 0.5, 0.25)
+
 local guideHead = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 guideHead:SetPoint("TOPLEFT", 22, -46)
 guideHead:SetText("Guidance")
@@ -257,7 +274,7 @@ notesHead:SetText("From Claude")
 
 local notes = CreateFrame("ScrollingMessageFrame", nil, panel)
 notes:SetPoint("TOPLEFT", 22, -122)
-notes:SetPoint("BOTTOMRIGHT", -22, 20)
+notes:SetPoint("BOTTOMRIGHT", -22, 44)
 notes:SetFontObject(GameFontHighlightSmall)
 notes:SetJustifyH("LEFT")
 notes:SetFading(false)
@@ -268,7 +285,30 @@ notes:SetScript("OnMouseWheel", function(self, delta)
     if delta > 0 then self:ScrollUp() else self:ScrollDown() end
 end)
 
+-- "0.3.1" < "0.4.0"
+local function older(a, b)
+    local x, y = {}, {}
+    for n in string.gmatch(a or "", "%d+") do table.insert(x, tonumber(n)) end
+    for n in string.gmatch(b or "", "%d+") do table.insert(y, tonumber(n)) end
+    for i = 1, math.max(#x, #y) do
+        local p, q = x[i] or 0, y[i] or 0
+        if p ~= q then return p < q end
+    end
+    return false
+end
+
+local function updateText()
+    local u = db().update
+    if u and older(VERSION, u.version) then
+        return string.format("Guide %s is out (you have %s)%s", u.version, VERSION,
+            (u.note and u.note ~= "") and (": " .. u.note) or ".")
+    end
+    db().update = nil          -- installed, or never newer
+    return nil
+end
+
 refreshPanel = function()
+    updateLine:SetText(updateText() or "")
     if guiding() then
         local where = state.label ~= "" and state.label or "a spot"
         guideLine:SetText(string.format("To %s: %d yd%s", where, state.yards or 0,
@@ -365,15 +405,35 @@ handlers.T = function(f)
     say("test from Claude: " .. (f[2] or ""))
 end
 
+local function hello()
+    SendAddonMessage(PREFIX, "H\t" .. VERSION, "WHISPER", UnitName("player"))
+end
+
+handlers.Q = function() hello() end
+
+handlers.U = function(f)
+    if not older(VERSION, f[2]) then return end
+    db().update = { version = f[2], note = f[3] or "" }
+    say("|cffff8040" .. updateText() .. "|r Copy the new Guide folder into Interface\\AddOns, then /reload.")
+    if panel:IsShown() then refreshPanel() end
+end
+
 local events = CreateFrame("Frame")
 events:RegisterEvent("CHAT_MSG_ADDON")
 events:RegisterEvent("PLAYER_LOGIN")
+events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:SetScript("OnEvent", function(self, event, prefix, msg, channel, sender)
     if event == "PLAYER_LOGIN" then
         local p = db().point
         if p then frame:ClearAllPoints(); frame:SetPoint(p[1], UIParent, p[2], p[3], p[4]) end
         placeButton()
         for _, n in ipairs(db().notes) do addNote(n[2], n[1]) end
+        if updateText() then say("|cffff8040" .. updateText() .. "|r") end
+        return
+    end
+    if event == "PLAYER_ENTERING_WORLD" then
+        self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+        hello()
         return
     end
     if prefix ~= PREFIX or channel ~= "WHISPER" or sender ~= TRUSTED then return end
