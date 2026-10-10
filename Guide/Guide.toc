@@ -2,7 +2,7 @@
 ## Title: Guide
 ## Notes: Directions from Claude, the realm's guide - an arrow that works in dungeons too.
 ## Author: Claude (for Jonas's realm)
-## Version: 0.1
+## Version: 0.2
 ## SavedVariables: GuideDB
 ## OptionalDeps: TomTom
 

@@ -12,8 +12,13 @@ Only messages FROM the character Claude are read. The server fills in the
 sender of a whisper, so nobody else can steer this arrow.
 
 Wire format (prefix "Guide", tab-separated):
-  A <yards> <angle> <mode> <label>   angle: world heading, radians, 0 = north,
+  A <yards> <angle> <mode> <label> <leg>
+                                     angle: world heading, radians, 0 = north,
                                      anticlockwise - the frame GetPlayerFacing uses
+                                     mode: compass (outdoors: straight at the target,
+                                     like TomTom), route (dungeon: to the next corner
+                                     of the way through; leg = yards to that corner),
+                                     lost (dungeon, no way found: straight line)
   D <label>                          arrived
   X <reason>                         stopped
   T <text>                           test
@@ -64,10 +69,22 @@ arrow:SetPoint("TOP")
 -- The minimap's own player arrow: it ships with every client and points up.
 arrow:SetTexture("Interface\\Minimap\\MinimapArrow")
 
+-- Route mode looks different on purpose: a ring round the arrow says "this
+-- points along the corridors, not at the target" (Jonas: a labyrinth gets no
+-- help from an arrow to the final destination).
+local ring = frame:CreateTexture(nil, "ARTWORK")
+ring:SetWidth(78); ring:SetHeight(78)
+ring:SetPoint("CENTER", arrow, "CENTER", 0, 0)
+ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+ring:SetTexCoord(0, 0.6, 0, 0.6)
+ring:Hide()
+
 local dist = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 dist:SetPoint("TOP", arrow, "BOTTOM", 0, 0)
 local label = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 label:SetPoint("TOP", dist, "BOTTOM", 0, -1)
+local turn = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+turn:SetPoint("TOP", label, "BOTTOM", 0, -1)
 
 -- Turn the arrow image anticlockwise by `a` radians. Each corner of the frame
 -- samples the texture at that corner turned back by -a (texture v runs down).
@@ -97,9 +114,15 @@ frame:SetScript("OnUpdate", function(self, elapsed)
     rel = math.fmod(rel + 3 * math.pi, 2 * math.pi) - math.pi     -- -pi..pi, + is to the left
     rotate(arrow, rel)
     local off = math.abs(rel)
-    if off < 0.26 then arrow:SetVertexColor(0.3, 1, 0.3)           -- within ~15 degrees
-    elseif off < 1.57 then arrow:SetVertexColor(1, 0.85, 0.2)
-    else arrow:SetVertexColor(1, 0.35, 0.3) end
+    if state.mode == "route" then                                   -- cool colours on a path
+        if off < 0.26 then arrow:SetVertexColor(0.3, 1, 1)
+        elseif off < 1.57 then arrow:SetVertexColor(0.35, 0.6, 1)
+        else arrow:SetVertexColor(0.75, 0.4, 1) end
+    else                                                            -- warm on a compass
+        if off < 0.26 then arrow:SetVertexColor(0.3, 1, 0.3)       -- within ~15 degrees
+        elseif off < 1.57 then arrow:SetVertexColor(1, 0.85, 0.2)
+        else arrow:SetVertexColor(1, 0.35, 0.3) end
+    end
 end)
 
 -- Messages ------------------------------------------------------------------
@@ -116,7 +139,16 @@ handlers.A = function(f)
     state.yards, state.heading = tonumber(f[2]), tonumber(f[3])
     state.mode, state.label, state.seen = f[4], f[5] or "", GetTime()
     if not state.heading then return end
-    dist:SetText(string.format("%d yd%s", state.yards or 0, state.mode == "line" and " (straight)" or ""))
+    local leg = tonumber(f[6]) or 0
+    if state.mode == "route" then
+        dist:SetText(string.format("%d yd by the way through", state.yards or 0))
+        turn:SetText(leg > 0 and leg < (state.yards or 0) - 1 and string.format("next turn in %d yd", leg) or "")
+        ring:Show()
+    else
+        dist:SetText(string.format("%d yd", state.yards or 0))
+        turn:SetText(state.mode == "lost" and "no way found - straight line" or "")
+        ring:Hide()
+    end
     label:SetText(state.label)
     frame:Show()
 end
