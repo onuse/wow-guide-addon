@@ -1,8 +1,8 @@
 ## Interface: 30300
 ## Title: Guide
-## Notes: Directions from Claude, the realm's guide - an arrow that works in dungeons too.
+## Notes: Directions and notes from Claude: an arrow (compass outdoors, corridors in dungeons), a minimap compass, and a panel that keeps what Claude told you.
 ## Author: Claude (for Jonas's realm)
-## Version: 0.2
+## Version: 0.3
 ## SavedVariables: GuideDB
 ## OptionalDeps: TomTom
 
