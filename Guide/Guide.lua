@@ -63,7 +63,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.5.0"
+local VERSION = "0.5.1"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -121,6 +121,8 @@ local state = { heading = nil, yards = nil, mode = nil, label = "", leg = 0, see
 local refreshPanel      -- defined with the panel below
 local dots, dotPool = {}, {}   -- minimap dots: {north, west} yards from you
 local clearDots         -- defined with the dots below
+local coordText         -- defined with the coordinate box below
+local setCoordBox       -- likewise
 
 -- The big arrow ---------------------------------------------------------------
 
@@ -427,7 +429,7 @@ local function myCoords()
     return x * 100, y * 100
 end
 
-local function coordText()
+coordText = function()
     local x, y = myCoords()
     if not x then return nil end
     return string.format("%.1f, %.1f", x, y)
@@ -468,7 +470,7 @@ coordBox:SetScript("OnUpdate", function(self, elapsed)
     coordLabel:SetText(coordText() or "--")
 end)
 
-local function setCoordBox(on)
+setCoordBox = function(on)
     db().coordBox = on
     if on then coordBox:Show() else coordBox:Hide() end
 end
