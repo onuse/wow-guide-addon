@@ -63,7 +63,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.5.3"
+local VERSION = "0.5.4"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -295,11 +295,11 @@ guideSub:SetPoint("TOPLEFT", guideLine, "BOTTOMLEFT", 0, -2)
 guideSub:SetWidth(296); guideSub:SetJustifyH("LEFT")
 
 local notesHead = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-notesHead:SetPoint("TOPLEFT", 22, -104)
+notesHead:SetPoint("TOPLEFT", guideSub, "BOTTOMLEFT", 0, -12)   -- follows the guidance text down when it wraps
 notesHead:SetText("From Claude")
 
 local notes = CreateFrame("ScrollingMessageFrame", nil, panel)
-notes:SetPoint("TOPLEFT", 22, -122)
+notes:SetPoint("TOPLEFT", notesHead, "BOTTOMLEFT", 0, -6)
 notes:SetPoint("BOTTOMRIGHT", -22, 44)
 notes:SetFontObject(GameFontHighlightSmall)
 notes:SetJustifyH("LEFT")
@@ -339,7 +339,9 @@ refreshPanel = function()
     updateLine:SetText(updateText() or "")
     if guiding() then
         local where = state.label ~= "" and state.label or "a spot"
-        guideLine:SetText(string.format("To %s: %d yd%s", where, state.yards or 0,
+        -- a label that is already an instruction ("Fly from ...") gets no "To"
+        local fmt = string.find(where, "^Fly ") and "%s: %d yd%s" or "To %s: %d yd%s"
+        guideLine:SetText(string.format(fmt, where, state.yards or 0,
             state.mode == "route" and " by the way through" or ""))
         guideSub:SetText(state.mode == "flight" and "In flight - Guide picks up again when you land."
             or state.mode == "route"
