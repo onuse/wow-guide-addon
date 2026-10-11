@@ -393,7 +393,7 @@ local function menuItems()
           keepShownOnClick = true, func = function() setBigArrow(not db().bigArrow) end },
         { text = "Lock big arrow", checked = db().locked,
           keepShownOnClick = true, func = function() db().locked = not db().locked end },
-        { text = "Coordinates box", checked = db().coordBox,
+        { text = "Show coordinates", checked = db().coordBox,
           keepShownOnClick = true, func = function() setCoordBox(not db().coordBox) end },
         { text = "Reset big arrow position", notCheckable = true, func = function()
             db().point = nil
