@@ -52,7 +52,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.4.2"
+local VERSION = "0.4.3"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -193,12 +193,15 @@ button:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) en
 
 button:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:AddLine("Guide")
+    -- name left, version right, actions in green: the common addon look
+    -- (Skada's, which Jonas pointed at, 2026-10-11)
+    GameTooltip:AddDoubleLine("Guide", VERSION, 1, 0.82, 0, 0.1, 1, 0.1)
     if state.heading then
         GameTooltip:AddLine(string.format("%s - %d yd", state.label ~= "" and state.label or "guiding", state.yards or 0), 1, 1, 1)
     end
-    GameTooltip:AddLine("Left-click: Claude panel", 0.7, 0.7, 0.7)
-    GameTooltip:AddLine("Right-click: options", 0.7, 0.7, 0.7)
+    GameTooltip:AddLine("|cff20ff20Left-Click|r to open the Claude panel.", 1, 1, 1)
+    GameTooltip:AddLine("|cff20ff20Right-Click|r to open the menu.", 1, 1, 1)
+    GameTooltip:AddLine("|cff20ff20Drag|r to move the button.", 1, 1, 1)
     GameTooltip:Show()
 end)
 button:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -251,12 +254,16 @@ local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 title:SetPoint("TOP", 0, -18)
 title:SetText("Claude")
 
+local versionText = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+versionText:SetPoint("BOTTOMRIGHT", -16, 14)
+versionText:SetText("Guide " .. VERSION)
+
 local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", -6, -6)
 
 local updateLine = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 updateLine:SetPoint("BOTTOMLEFT", 22, 16)     -- under the notes; wraps upwards
-updateLine:SetWidth(296); updateLine:SetJustifyH("LEFT")
+updateLine:SetWidth(232); updateLine:SetJustifyH("LEFT")   -- leaves room for the version, bottom right
 updateLine:SetTextColor(1, 0.5, 0.25)
 
 local guideHead = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
