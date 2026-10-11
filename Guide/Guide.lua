@@ -15,7 +15,8 @@ Three places show it:
   - the big arrow, near the top of the screen (drag it; /guide lock)
   - the minimap button, whose icon IS a little arrow while you are being
     guided - a compass on the minimap's edge. Left-click: the Claude panel.
-    Right-click: big arrow on/off. Drag it round the minimap.
+    Right-click: options menu (big arrow, lock, reset, clear notes). Drag it round
+    the minimap.
   - the Claude panel: where you are headed, and a log of what Claude has told
     you, kept between sessions so directions do not scroll out of chat.
 
@@ -51,7 +52,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.4.1"
+local VERSION = "0.4.2"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -197,7 +198,7 @@ button:SetScript("OnEnter", function(self)
         GameTooltip:AddLine(string.format("%s - %d yd", state.label ~= "" and state.label or "guiding", state.yards or 0), 1, 1, 1)
     end
     GameTooltip:AddLine("Left-click: Claude panel", 0.7, 0.7, 0.7)
-    GameTooltip:AddLine("Right-click: big arrow on/off", 0.7, 0.7, 0.7)
+    GameTooltip:AddLine("Right-click: options", 0.7, 0.7, 0.7)
     GameTooltip:Show()
 end)
 button:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -342,8 +343,46 @@ local function setBigArrow(on)
     say(on and "big arrow on." or "big arrow off - the minimap compass still points the way.")
 end
 
+-- Right-click menu: the settings live here, labeled, rather than behind a
+-- bare toggle (Jonas, 2026-10-11: "more extendable, and easier to click on a
+-- labeled option"). Same menu frame the game uses for unit portraits.
+local menuFrame = CreateFrame("Frame", "GuideMenu", UIParent, "UIDropDownMenuTemplate")
+
+StaticPopupDialogs["GUIDE_CLEAR_NOTES"] = {
+    text = "Clear everything in the Claude panel's notes?",
+    button1 = YES, button2 = NO,
+    OnAccept = function()
+        wipe(db().notes); notes:Clear()
+        say("notes cleared.")
+    end,
+    timeout = 0, whileDead = true, hideOnEscape = true,
+}
+
+local function menuItems()
+    return {
+        { text = "Guide " .. VERSION, isTitle = true, notCheckable = true },
+        { text = "Claude panel", notCheckable = true, func = togglePanel },
+        { text = "Big arrow", checked = db().bigArrow,      -- a boolean: 3.3.5 menus take no functions here
+          keepShownOnClick = true, func = function() setBigArrow(not db().bigArrow) end },
+        { text = "Lock big arrow", checked = db().locked,
+          keepShownOnClick = true, func = function() db().locked = not db().locked end },
+        { text = "Reset big arrow position", notCheckable = true, func = function()
+            db().point = nil
+            frame:ClearAllPoints(); frame:SetPoint("TOP", UIParent, "TOP", 0, -120)
+            say("big arrow back at the top of the screen.")
+        end },
+        { text = "Clear notes...", notCheckable = true, func = function() StaticPopup_Show("GUIDE_CLEAR_NOTES") end },
+        { text = CLOSE, notCheckable = true, func = function() CloseDropDownMenus() end },
+    }
+end
+
 button:SetScript("OnClick", function(self, which)
-    if which == "RightButton" then setBigArrow(not db().bigArrow) else togglePanel() end
+    if which == "RightButton" then
+        GameTooltip:Hide()
+        EasyMenu(menuItems(), menuFrame, "cursor", 0, 0, "MENU")
+    else
+        togglePanel()
+    end
 end)
 
 -- Messages ------------------------------------------------------------------
