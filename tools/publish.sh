@@ -2,7 +2,7 @@
 # Publish one Guide release to the share as its own folder,
 #   \\192.168.1.81\SharePiFast\WoWfiles\Guide-<version>\Guide
 # and as a zip for everyone else (public, through the monitor's Funnel front):
-#   https://grizzlyhills.tail2c599a.ts.net:8443/downloads/guide/Guide-<version>.zip
+#   https://grizzlyhills.tail2c599a.ts.net:8443/downloads/addons/Guide-<version>.zip
 # and never touch either again. A new version is a new path: Windows has nothing
 # cached for it, so no stale listings and no "0x80070057 Felaktig parameter"
 # (2026-10-11, when replacing the one Guide folder under an open Explorer).
@@ -29,7 +29,7 @@ mkdir -p "$dest/Guide"
 cp "$src"/* "$dest/Guide/"
 sudo -n chown -R nobody:nogroup "$dest"
 sudo -n chmod -R a+rwX "$dest"
-zip=/mnt/wow-data2/downloads/guide/Guide-$ver.zip
+zip=/mnt/wow-data2/downloads/addons/Guide-$ver.zip
 [ -e "$zip" ] || (cd "$dest" && zip -qr "$zip" Guide)
 echo "published $dest"
-echo "published https://grizzlyhills.tail2c599a.ts.net:8443/downloads/guide/Guide-$ver.zip"
+echo "published https://grizzlyhills.tail2c599a.ts.net:8443/downloads/addons/Guide-$ver.zip"
