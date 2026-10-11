@@ -63,7 +63,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.5.2"
+local VERSION = "0.5.3"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -495,7 +495,7 @@ local function dotTexture(i)
     if not t then
         t = CreateFrame("Frame", nil, Minimap)
         t:SetWidth(12); t:SetHeight(12)
-        t:SetFrameLevel(Minimap:GetFrameLevel() + 5)
+        t:SetFrameLevel(Minimap:GetFrameLevel() + 10)   -- above the minimap's own buttons
         local tex = t:CreateTexture(nil, "OVERLAY")
         tex:SetAllPoints()
         tex:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_1")   -- the yellow star
@@ -522,8 +522,9 @@ local function drawDots()
         x, y = x * scale, y * scale
         local r = math.sqrt(x * x + y * y)
         local t = dotTexture(i)
-        if r > half - 6 then                                -- off the minimap: on its rim, faded
-            x, y = x * (half - 6) / r, y * (half - 6) / r
+        local rim = half - 16                               -- just inside the rim, clear of its buttons
+        if r > rim then                                     -- off the minimap: at its edge, faded
+            x, y = x * rim / r, y * rim / r
             t:SetAlpha(0.45)
         else
             t:SetAlpha(1)
