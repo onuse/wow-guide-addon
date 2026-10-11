@@ -28,7 +28,12 @@ Wire format (prefix "Guide", tab-separated):
                      angle: world heading, radians, 0 = north, anticlockwise -
                      the frame GetPlayerFacing uses. mode: compass (outdoors),
                      route (dungeon corridors; leg = yards to the next turn),
-                     lost (dungeon, no way found: straight line)
+                     lost (dungeon, no way found: straight line),
+                     flight (on a flight path; nothing to steer until landing)
+  P <indoor> <n,w;n,w;...>
+                     minimap dots for the other targets (a hunt's other live
+                     ones, the rest of a list of spots): yards north and west
+                     of you. Empty = none.
   D <label>          arrived
   X <reason>         stopped
   N <text>           a note for the panel
@@ -52,7 +57,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.4.3"
+local VERSION = "0.5.0"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -93,6 +98,7 @@ local function rotate(tex, a)
 end
 
 local function tint(tex, mode, off)
+    if mode == "flight" then tex:SetVertexColor(0.6, 0.6, 0.6); return end
     if mode == "route" then                                         -- cool on a path
         if off < 0.26 then tex:SetVertexColor(0.3, 1, 1)
         elseif off < 1.57 then tex:SetVertexColor(0.35, 0.6, 1)
@@ -106,6 +112,8 @@ end
 
 local state = { heading = nil, yards = nil, mode = nil, label = "", leg = 0, seen = 0 }
 local refreshPanel      -- defined with the panel below
+local dots, dotPool = {}, {}   -- minimap dots: {north, west} yards from you
+local clearDots         -- defined with the dots below
 
 -- The big arrow ---------------------------------------------------------------
 
@@ -323,11 +331,15 @@ refreshPanel = function()
         local where = state.label ~= "" and state.label or "a spot"
         guideLine:SetText(string.format("To %s: %d yd%s", where, state.yards or 0,
             state.mode == "route" and " by the way through" or ""))
-        guideSub:SetText(state.mode == "route"
+        guideSub:SetText(state.mode == "flight" and "In flight - Guide picks up again when you land."
+            or state.mode == "route"
             and (state.leg > 0 and string.format("Following the corridors - next turn in %d yd.", state.leg)
                  or "Following the corridors - straight on to the end.")
             or state.mode == "lost" and "No way through found - this is the straight line."
             or "Compass: straight at the target.")
+        if #dots > 0 then
+            guideSub:SetText(guideSub:GetText() .. string.format(" %d more on the minimap (stars).", #dots))
+        end
     else
         guideLine:SetText("Not guiding right now.")
         guideSub:SetText("Whisper Claude \"guide me to ...\" and an arrow appears.")
@@ -392,6 +404,61 @@ button:SetScript("OnClick", function(self, which)
     end
 end)
 
+-- Minimap dots ------------------------------------------------------------
+-- The server sends where the other targets are as yards north and west of
+-- you, once a second; they are drawn on the minimap at its current zoom (the
+-- minimap shows a different number of yards indoors). No map coordinates
+-- needed, so this works in dungeons too.
+
+local MINIMAP_YARDS = {     -- minimap diameter in yards, by zoom level 0-5
+    [false] = { 466.6667, 400, 333.3333, 266.6667, 200, 133.3333 },
+    [true]  = { 300, 240, 180, 120, 80, 50 },
+}
+local dotsIndoor = false
+
+local function dotTexture(i)
+    local t = dotPool[i]
+    if not t then
+        t = Minimap:CreateTexture(nil, "OVERLAY")
+        t:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_1")   -- the yellow star
+        t:SetWidth(12); t:SetHeight(12)
+        dotPool[i] = t
+    end
+    return t
+end
+
+clearDots = function()
+    wipe(dots)
+    for _, t in ipairs(dotPool) do t:Hide() end
+end
+
+local function drawDots()
+    local diameter = MINIMAP_YARDS[dotsIndoor][(Minimap:GetZoom() or 0) + 1] or 466.6667
+    local half = Minimap:GetWidth() / 2
+    local scale = Minimap:GetWidth() / diameter
+    local rotating = GetCVar("rotateMinimap") == "1"
+    local a = rotating and (GetPlayerFacing() or 0) or 0
+    local ca, sa = math.cos(a), math.sin(a)
+    for i, d in ipairs(dots) do
+        local east, north = -d[2], d[1]
+        local x, y = east * ca + north * sa, -east * sa + north * ca   -- your facing up, if the minimap turns
+        x, y = x * scale, y * scale
+        local r = math.sqrt(x * x + y * y)
+        local t = dotTexture(i)
+        if r > half - 6 then                                -- off the minimap: on its rim, faded
+            x, y = x * (half - 6) / r, y * (half - 6) / r
+            t:SetAlpha(0.45)
+        else
+            t:SetAlpha(1)
+        end
+        t:ClearAllPoints(); t:SetPoint("CENTER", Minimap, "CENTER", x, y); t:Show()
+    end
+    for i = #dots + 1, #dotPool do dotPool[i]:Hide() end
+end
+
+local dotTicker = CreateFrame("Frame")
+dotTicker:SetScript("OnUpdate", function() if #dots > 0 then drawDots() end end)
+
 -- Messages ------------------------------------------------------------------
 
 local function split(msg)
@@ -407,7 +474,11 @@ handlers.A = function(f)
     if not heading then return end
     state.yards, state.heading = tonumber(f[2]), heading
     state.mode, state.label, state.leg, state.seen = f[4], f[5] or "", tonumber(f[6]) or 0, GetTime()
-    if state.mode == "route" then
+    if state.mode == "flight" then
+        dist:SetText("in flight")
+        turn:SetText("picks up again when you land")
+        ring:Hide()
+    elseif state.mode == "route" then
         dist:SetText(string.format("%d yd by the way through", state.yards or 0))
         turn:SetText(state.leg > 0 and string.format("next turn in %d yd", state.leg) or "")
         ring:Show()
@@ -425,9 +496,20 @@ end
 
 local function stopGuiding(text)
     state.heading = nil
+    clearDots()
     frame:Hide(); idleIcon()
     if panel:IsShown() then refreshPanel() end
     say(text)
+end
+
+handlers.P = function(f)
+    wipe(dots)
+    dotsIndoor = f[2] == "1"
+    for n, w in string.gmatch(f[3] or "", "(-?[%d%.]+),(-?[%d%.]+)") do
+        table.insert(dots, { tonumber(n), tonumber(w) })
+    end
+    if #dots == 0 then clearDots() end
+    if panel:IsShown() then refreshPanel() end
 end
 
 handlers.D = function(f)
