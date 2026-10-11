@@ -63,7 +63,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.5.1"
+local VERSION = "0.5.2"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -487,12 +487,18 @@ local MINIMAP_YARDS = {     -- minimap diameter in yards, by zoom level 0-5
 }
 local dotsIndoor = false
 
+-- Each dot is a small frame of its own above the minimap: a texture on the
+-- Minimap frame itself is drawn under the map picture and never shows
+-- (0.5.1, mele's hunt test).
 local function dotTexture(i)
     local t = dotPool[i]
     if not t then
-        t = Minimap:CreateTexture(nil, "OVERLAY")
-        t:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_1")   -- the yellow star
+        t = CreateFrame("Frame", nil, Minimap)
         t:SetWidth(12); t:SetHeight(12)
+        t:SetFrameLevel(Minimap:GetFrameLevel() + 5)
+        local tex = t:CreateTexture(nil, "OVERLAY")
+        tex:SetAllPoints()
+        tex:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_1")   -- the yellow star
         dotPool[i] = t
     end
     return t

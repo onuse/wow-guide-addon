@@ -2,7 +2,7 @@
 ## Title: Guide
 ## Notes: Directions and notes from Claude: an arrow (compass outdoors, corridors in dungeons), a minimap compass, and a panel that keeps what Claude told you.
 ## Author: Claude (for Jonas's realm)
-## Version: 0.5.1
+## Version: 0.5.2
 ## SavedVariables: GuideDB
 ## OptionalDeps: TomTom
 
