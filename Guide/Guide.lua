@@ -63,7 +63,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.5.4"
+local VERSION = "0.5.5"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -434,19 +434,19 @@ end
 coordText = function()
     local x, y = myCoords()
     if not x then return nil end
-    return string.format("%.1f, %.1f", x, y)
+    return string.format("%.2f, %.2f", x, y)
 end
 
 -- The small coordinate box, like TomTom's: drag it anywhere; on or off from
 -- the minimap button's menu.
 local coordBox = CreateFrame("Frame", "GuideCoordBox", UIParent)
-coordBox:SetWidth(90); coordBox:SetHeight(22)
+coordBox:SetWidth(118); coordBox:SetHeight(28)
 coordBox:SetPoint("TOP", Minimap, "BOTTOM", 0, -14)
 coordBox:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12,
-    insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-coordBox:SetBackdropColor(0, 0, 0, 0.7)
-coordBox:SetBackdropBorderColor(0.6, 0.6, 0.6, 0.8)
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 14,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 } })
+coordBox:SetBackdropColor(0, 0, 0, 0.8)
+coordBox:SetBackdropBorderColor(1, 0.82, 0, 1)        -- gold, like TomTom's (Jonas, 2026-10-11)
 coordBox:SetMovable(true); coordBox:EnableMouse(true); coordBox:RegisterForDrag("LeftButton")
 coordBox:SetClampedToScreen(true)
 coordBox:SetScript("OnDragStart", coordBox.StartMoving)
@@ -462,7 +462,9 @@ coordBox:SetScript("OnEnter", function(self)
     GameTooltip:Show()
 end)
 coordBox:SetScript("OnLeave", function() GameTooltip:Hide() end)
-local coordLabel = coordBox:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+local coordLabel = coordBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+coordLabel:SetFont(STANDARD_TEXT_FONT, 14)
+coordLabel:SetTextColor(1, 0.82, 0)
 coordLabel:SetPoint("CENTER")
 local coordElapsed = 0
 coordBox:SetScript("OnUpdate", function(self, elapsed)
