@@ -40,14 +40,20 @@ Wire format (prefix "Guide", tab-separated):
   T <text>           test
   U <version> <note> a newer Guide is out: the panel and chat say so
   Q                  say hello again
+  M <text>           a one-off line for chat (a /way the server could not place)
 
 And back, to the server:
+  W <zone> <x> <y> <label>   /way (zone empty = the one you are in)
+  S                  /way reset
   H <version>        hello, on entering the world and on Q. Whispered to
                      yourself, so it works whether Claude is online or not;
                      the server reads it on the way past. This is how Claude
                      knows which version you run, and sees when an update
                      has been installed.
 
+/way [zone] x y [label]   guide me to a map spot (TomTom's format; /gway
+                          if TomTom is installed and keeps /way)
+/way reset                stop
 /guide          the Claude panel
 /guide arrow    big arrow on/off
 /guide lock     lock or unlock the big arrow's position
@@ -69,6 +75,7 @@ local function db()
     if GuideDB.locked == nil then GuideDB.locked = false end
     if GuideDB.bigArrow == nil then GuideDB.bigArrow = true end
     if GuideDB.buttonAngle == nil then GuideDB.buttonAngle = 200 end
+    if GuideDB.coordBox == nil then GuideDB.coordBox = true end
     return GuideDB
 end
 
@@ -207,6 +214,7 @@ button:SetScript("OnEnter", function(self)
     if state.heading then
         GameTooltip:AddLine(string.format("%s - %d yd", state.label ~= "" and state.label or "guiding", state.yards or 0), 1, 1, 1)
     end
+    GameTooltip:AddDoubleLine(GetZoneText(), coordText() or "no map here", 0.8, 0.8, 0.8, 1, 1, 1)
     GameTooltip:AddLine("|cff20ff20Left-Click|r to open the Claude panel.", 1, 1, 1)
     GameTooltip:AddLine("|cff20ff20Right-Click|r to open the menu.", 1, 1, 1)
     GameTooltip:AddLine("|cff20ff20Drag|r to move the button.", 1, 1, 1)
@@ -385,6 +393,8 @@ local function menuItems()
           keepShownOnClick = true, func = function() setBigArrow(not db().bigArrow) end },
         { text = "Lock big arrow", checked = db().locked,
           keepShownOnClick = true, func = function() db().locked = not db().locked end },
+        { text = "Coordinates box", checked = db().coordBox,
+          keepShownOnClick = true, func = function() setCoordBox(not db().coordBox) end },
         { text = "Reset big arrow position", notCheckable = true, func = function()
             db().point = nil
             frame:ClearAllPoints(); frame:SetPoint("TOP", UIParent, "TOP", 0, -120)
@@ -403,6 +413,65 @@ button:SetScript("OnClick", function(self, which)
         togglePanel()
     end
 end)
+
+-- Your coordinates --------------------------------------------------------
+-- The zone map's own percentages, as /way takes them. The old dungeons have
+-- no map, so nothing there. The world map is only switched to your zone
+-- when it is closed, so this never moves a map you are looking at.
+
+local function myCoords()
+    if WorldMapFrame and WorldMapFrame:IsShown() then return nil end
+    SetMapToCurrentZone()
+    local x, y = GetPlayerMapPosition("player")
+    if not x or (x == 0 and y == 0) then return nil end
+    return x * 100, y * 100
+end
+
+local function coordText()
+    local x, y = myCoords()
+    if not x then return nil end
+    return string.format("%.1f, %.1f", x, y)
+end
+
+-- The small coordinate box, like TomTom's: drag it anywhere; on or off from
+-- the minimap button's menu.
+local coordBox = CreateFrame("Frame", "GuideCoordBox", UIParent)
+coordBox:SetWidth(90); coordBox:SetHeight(22)
+coordBox:SetPoint("TOP", Minimap, "BOTTOM", 0, -14)
+coordBox:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+coordBox:SetBackdropColor(0, 0, 0, 0.7)
+coordBox:SetBackdropBorderColor(0.6, 0.6, 0.6, 0.8)
+coordBox:SetMovable(true); coordBox:EnableMouse(true); coordBox:RegisterForDrag("LeftButton")
+coordBox:SetClampedToScreen(true)
+coordBox:SetScript("OnDragStart", coordBox.StartMoving)
+coordBox:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    local p, _, rp, x, y = self:GetPoint()
+    db().coordPoint = { p, rp, x, y }
+end)
+coordBox:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:AddLine("Your position on the zone map")
+    GameTooltip:AddLine("|cff20ff20Drag|r to move. Hide it from the Guide button's menu.", 1, 1, 1)
+    GameTooltip:Show()
+end)
+coordBox:SetScript("OnLeave", function() GameTooltip:Hide() end)
+local coordLabel = coordBox:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+coordLabel:SetPoint("CENTER")
+local coordElapsed = 0
+coordBox:SetScript("OnUpdate", function(self, elapsed)
+    coordElapsed = coordElapsed + elapsed
+    if coordElapsed < 0.5 then return end      -- each read resets the world map to your zone: not too often
+    coordElapsed = 0
+    coordLabel:SetText(coordText() or "--")
+end)
+
+local function setCoordBox(on)
+    db().coordBox = on
+    if on then coordBox:Show() else coordBox:Hide() end
+end
 
 -- Minimap dots ------------------------------------------------------------
 -- The server sends where the other targets are as yards north and west of
@@ -535,6 +604,10 @@ handlers.T = function(f)
     say("test from Claude: " .. (f[2] or ""))
 end
 
+handlers.M = function(f)
+    say(f[2] or "")
+end
+
 local function hello()
     SendAddonMessage(PREFIX, "H\t" .. VERSION, "WHISPER", UnitName("player"))
 end
@@ -557,6 +630,10 @@ events:SetScript("OnEvent", function(self, event, prefix, msg, channel, sender)
         local p = db().point
         if p then frame:ClearAllPoints(); frame:SetPoint(p[1], UIParent, p[2], p[3], p[4]) end
         placeButton()
+        local cp = db().coordPoint
+        if cp then coordBox:ClearAllPoints(); coordBox:SetPoint(cp[1], UIParent, cp[2], cp[3], cp[4]) end
+        setCoordBox(db().coordBox)
+        if not IsAddOnLoaded("TomTom") then SLASH_GUIDEWAY2 = "/way" end
         for _, n in ipairs(db().notes) do addNote(n[2], n[1]) end
         if updateText() then say("|cffff8040" .. string.gsub(updateText(), "^Guide ", "version ", 1) .. "|r") end
         return
@@ -574,6 +651,33 @@ events:SetScript("OnEvent", function(self, event, prefix, msg, channel, sender)
 end)
 
 -- Slash command -------------------------------------------------------------
+
+-- /way, TomTom's way: /way [zone] x y [label], commas allowed; /way reset.
+-- The spot goes to the server, which guides you there like any other target
+-- (inside dungeons and caves too). If TomTom is installed it keeps /way and
+-- Guide answers to /gway only.
+local function way(msg)
+    msg = string.gsub(msg or "", ",", " ")
+    local words = {}
+    for w in string.gmatch(msg, "%S+") do table.insert(words, w) end
+    if #words == 1 and string.lower(words[1]) == "reset" then
+        SendAddonMessage(PREFIX, "S", "WHISPER", UnitName("player"))
+        return
+    end
+    for i = 1, #words - 1 do
+        local x, y = tonumber(words[i]), tonumber(words[i + 1])
+        if x and y then
+            local zone = table.concat(words, " ", 1, i - 1)
+            local label = table.concat(words, " ", i + 2)
+            SendAddonMessage(PREFIX, string.format("W\t%s\t%s\t%s\t%s", zone, x, y, label), "WHISPER", UnitName("player"))
+            return
+        end
+    end
+    say("usage: /way [zone] x y [label] - e.g. /way Dustwallow Marsh 42.8 72.4 Flight master - or /way reset")
+end
+
+SLASH_GUIDEWAY1 = "/gway"
+SlashCmdList["GUIDEWAY"] = way
 
 SLASH_GUIDE1 = "/guide"
 SlashCmdList["GUIDE"] = function(arg)
