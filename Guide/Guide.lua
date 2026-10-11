@@ -63,7 +63,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.5.6"
+local VERSION = "0.5.7"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -393,6 +393,9 @@ local function menuItems()
     return {
         { text = "Guide " .. VERSION, isTitle = true, notCheckable = true },
         { text = "Claude panel", notCheckable = true, func = togglePanel },
+        -- the same as /way reset (Jonas, 2026-10-11: "an ability to Clear target")
+        { text = "Stop guiding", notCheckable = true, disabled = not guiding(),
+          func = function() SendAddonMessage(PREFIX, "S", "WHISPER", UnitName("player")) end },
         { text = "Big arrow", checked = db().bigArrow,      -- a boolean: 3.3.5 menus take no functions here
           keepShownOnClick = true, func = function() setBigArrow(not db().bigArrow) end },
         { text = "Lock big arrow", checked = db().locked,
