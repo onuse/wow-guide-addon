@@ -63,7 +63,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.5.5"
+local VERSION = "0.5.6"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -440,7 +440,7 @@ end
 -- The small coordinate box, like TomTom's: drag it anywhere; on or off from
 -- the minimap button's menu.
 local coordBox = CreateFrame("Frame", "GuideCoordBox", UIParent)
-coordBox:SetWidth(118); coordBox:SetHeight(28)
+coordBox:SetWidth(100); coordBox:SetHeight(26)
 coordBox:SetPoint("TOP", Minimap, "BOTTOM", 0, -14)
 coordBox:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 14,
@@ -463,7 +463,7 @@ coordBox:SetScript("OnEnter", function(self)
 end)
 coordBox:SetScript("OnLeave", function() GameTooltip:Hide() end)
 local coordLabel = coordBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-coordLabel:SetFont(STANDARD_TEXT_FONT, 14)
+coordLabel:SetFont(STANDARD_TEXT_FONT, 12)
 coordLabel:SetTextColor(1, 0.82, 0)
 coordLabel:SetPoint("CENTER")
 local coordElapsed = 0
