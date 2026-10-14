@@ -63,7 +63,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.5.7"
+local VERSION = "0.5.8"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -76,6 +76,7 @@ local function db()
     if GuideDB.bigArrow == nil then GuideDB.bigArrow = true end
     if GuideDB.buttonAngle == nil then GuideDB.buttonAngle = 200 end
     if GuideDB.coordBox == nil then GuideDB.coordBox = true end
+    if GuideDB.meters == nil then GuideDB.meters = true end   -- players in Sweden asked for meters (2026-10-14)
     return GuideDB
 end
 
@@ -118,6 +119,17 @@ local function tint(tex, mode, off)
 end
 
 local state = { heading = nil, yards = nil, mode = nil, label = "", leg = 0, seen = 0 }
+
+-- A distance as the player wants to read it. The server always speaks yards
+-- (the game's own unit); meters are the default here, a menu choice turns
+-- yards back on. 1 yard = 0.9144 m.
+local function distText(yards)
+    yards = yards or 0
+    if GuideDB and GuideDB.meters == false then
+        return string.format("%d yd", yards)
+    end
+    return string.format("%d m", math.floor(yards * 0.9144 + 0.5))
+end
 local refreshPanel      -- defined with the panel below
 local dots, dotPool = {}, {}   -- minimap dots: {north, west} yards from you
 local clearDots         -- defined with the dots below
@@ -214,7 +226,7 @@ button:SetScript("OnEnter", function(self)
     -- (Skada's, which Jonas pointed at, 2026-10-11)
     GameTooltip:AddDoubleLine("Guide", VERSION, 1, 0.82, 0, 0.1, 1, 0.1)
     if state.heading then
-        GameTooltip:AddLine(string.format("%s - %d yd", state.label ~= "" and state.label or "guiding", state.yards or 0), 1, 1, 1)
+        GameTooltip:AddLine(string.format("%s - %s", state.label ~= "" and state.label or "guiding", distText(state.yards)), 1, 1, 1)
     end
     GameTooltip:AddDoubleLine(GetZoneText(), coordText() or "no map here", 0.8, 0.8, 0.8, 1, 1, 1)
     GameTooltip:AddLine("|cff20ff20Left-Click|r to open the Claude panel.", 1, 1, 1)
@@ -340,12 +352,12 @@ refreshPanel = function()
     if guiding() then
         local where = state.label ~= "" and state.label or "a spot"
         -- a label that is already an instruction ("Fly from ...") gets no "To"
-        local fmt = string.find(where, "^Fly ") and "%s: %d yd%s" or "To %s: %d yd%s"
-        guideLine:SetText(string.format(fmt, where, state.yards or 0,
+        local fmt = string.find(where, "^Fly ") and "%s: %s%s" or "To %s: %s%s"
+        guideLine:SetText(string.format(fmt, where, distText(state.yards),
             state.mode == "route" and " by the way through" or ""))
         guideSub:SetText(state.mode == "flight" and "In flight - Guide picks up again when you land."
             or state.mode == "route"
-            and (state.leg > 0 and string.format("Following the corridors - next turn in %d yd.", state.leg)
+            and (state.leg > 0 and string.format("Following the corridors - next turn in %s.", distText(state.leg))
                  or "Following the corridors - straight on to the end.")
             or state.mode == "lost" and "No way through found - this is the straight line."
             or "Compass: straight at the target.")
@@ -402,6 +414,8 @@ local function menuItems()
           keepShownOnClick = true, func = function() db().locked = not db().locked end },
         { text = "Show coordinates", checked = db().coordBox,
           keepShownOnClick = true, func = function() setCoordBox(not db().coordBox) end },
+        { text = "Distances in meters", checked = db().meters,
+          keepShownOnClick = true, func = function() db().meters = not db().meters; refreshPanel() end },
         { text = "Reset big arrow position", notCheckable = true, func = function()
             db().point = nil
             frame:ClearAllPoints(); frame:SetPoint("TOP", UIParent, "TOP", 0, -120)
@@ -564,11 +578,11 @@ handlers.A = function(f)
         turn:SetText("picks up again when you land")
         ring:Hide()
     elseif state.mode == "route" then
-        dist:SetText(string.format("%d yd by the way through", state.yards or 0))
-        turn:SetText(state.leg > 0 and string.format("next turn in %d yd", state.leg) or "")
+        dist:SetText(distText(state.yards) .. " by the way through")
+        turn:SetText(state.leg > 0 and ("next turn in " .. distText(state.leg)) or "")
         ring:Show()
     else
-        dist:SetText(string.format("%d yd", state.yards or 0))
+        dist:SetText(distText(state.yards))
         turn:SetText(state.mode == "lost" and "no way found - straight line" or "")
         ring:Hide()
     end
