@@ -46,7 +46,8 @@ Wire format (prefix "Guide", tab-separated):
 
 And back, to the server:
   W <zone> <x> <y> <label>   /way (zone empty = the one you are in)
-  S                  /way reset
+  S                  /way reset, /guide stop
+  G <what>           /guide gather: ore or herbs, found by the server
   H <version>        hello, on entering the world and on Q. Whispered to
                      yourself, so it works whether Claude is online or not;
                      the server reads it on the way past. This is how Claude
@@ -60,12 +61,16 @@ And back, to the server:
 /guide arrow    big arrow on/off
 /guide lock     lock or unlock the big arrow's position
 /guide log      print the last raw messages (testing)
+/guide gather <what>   lead me from node to node: part of a name (copper,
+                       peacebloom), or ore, or herbs - everything your skill
+                       can gather here. Works with Claude offline.
+/guide stop     stop guiding me
 ]]
 
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.5.9"
+local VERSION = "0.6.0"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -746,7 +751,16 @@ SlashCmdList["GUIDEWAY"] = way
 SLASH_GUIDE1 = "/guide"
 SlashCmdList["GUIDE"] = function(arg)
     arg = string.lower(arg or "")
-    if arg == "lock" then
+    local what = string.match(arg, "^gather%s*(.*)$")
+    if what then
+        if what == "" then
+            say("usage: /guide gather copper - or ore, or herbs; /guide stop to end it")
+        else
+            SendAddonMessage(PREFIX, "G\t" .. what, "WHISPER", UnitName("player"))
+        end
+    elseif arg == "stop" then
+        SendAddonMessage(PREFIX, "S", "WHISPER", UnitName("player"))
+    elseif arg == "lock" then
         db().locked = not db().locked
         say(db().locked and "arrow locked." or "arrow unlocked - drag it where you like.")
     elseif arg == "arrow" then
