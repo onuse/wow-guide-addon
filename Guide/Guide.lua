@@ -41,6 +41,8 @@ Wire format (prefix "Guide", tab-separated):
   U <version> <note> a newer Guide is out: the panel and chat say so
   Q                  say hello again
   M <text>           a one-off line for chat (a /way the server could not place)
+  C <0|1>            1: this character is held at its level cap (60 until
+                     Into the Breach): hide the XP bar and rested tick
 
 And back, to the server:
   W <zone> <x> <y> <label>   /way (zone empty = the one you are in)
@@ -63,7 +65,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.5.8"
+local VERSION = "0.5.9"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -649,6 +651,38 @@ handlers.U = function(f)
     db().update = { version = f[2], note = f[3] or "" }
     say("|cffff8040" .. string.gsub(updateText(), "^Guide ", "version ", 1) .. "|r Copy the new Guide folder into Interface\\AddOns, then /reload.")
     if panel:IsShown() then refreshPanel() end
+end
+
+-- Held at a level cap (C) ------------------------------------------------------
+-- mod-individual-progression holds a character at 60 (70 later) while the
+-- client's own cap is 80, so the XP bar would sit there, filling with rest
+-- that can never be used. The server says when this character is held; then
+-- the XP bar and its rested tick are hidden and the plain max-level bar shown,
+-- as the game does at its real cap. Blizzard's ReputationWatchBar_Update
+-- shows the XP bar again whenever it runs, hence the hooks. Only unprotected
+-- frames are touched, and MAX_PLAYER_LEVEL is left alone (tainting it could
+-- block the action bars in combat).
+local capped = false
+
+local function applyCap()
+    if capped then
+        MainMenuExpBar:Hide()
+        ExhaustionTick:Hide()
+        MainMenuBarMaxLevelBar:Show()
+    elseif ReputationWatchBar_Update then
+        ReputationWatchBar_Update()
+    end
+end
+
+if ReputationWatchBar_Update then
+    hooksecurefunc("ReputationWatchBar_Update", function() if capped then applyCap() end end)
+end
+MainMenuExpBar:HookScript("OnShow", function(self) if capped then self:Hide() end end)
+ExhaustionTick:HookScript("OnShow", function(self) if capped then self:Hide() end end)
+
+handlers.C = function(f)
+    capped = f[2] == "1"
+    applyCap()
 end
 
 local events = CreateFrame("Frame")
