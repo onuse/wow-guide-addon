@@ -70,7 +70,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.6.0"
+local VERSION = "0.6.1"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -653,9 +653,12 @@ handlers.Q = function() hello() end
 
 handlers.U = function(f)
     if not older(VERSION, f[2]) then return end
+    local known = db().update
     db().update = { version = f[2], note = f[3] or "" }
-    say("|cffff8040" .. string.gsub(updateText(), "^Guide ", "version ", 1) .. "|r Copy the new Guide folder into Interface\\AddOns, then /reload.")
     if panel:IsShown() then refreshPanel() end
+    -- PLAYER_LOGIN already said it for this version; say it once per login
+    if known and known.version == f[2] then return end
+    say("|cffff8040" .. string.gsub(updateText(), "^Guide ", "version ", 1) .. "|r Copy the new Guide folder into Interface\\AddOns, then /reload.")
 end
 
 -- Held at a level cap (C) ------------------------------------------------------
@@ -704,7 +707,7 @@ events:SetScript("OnEvent", function(self, event, prefix, msg, channel, sender)
         setCoordBox(db().coordBox)
         if not IsAddOnLoaded("TomTom") then SLASH_GUIDEWAY2 = "/way" end
         for _, n in ipairs(db().notes) do addNote(n[2], n[1]) end
-        if updateText() then say("|cffff8040" .. string.gsub(updateText(), "^Guide ", "version ", 1) .. "|r") end
+        if updateText() then say("|cffff8040" .. string.gsub(updateText(), "^Guide ", "version ", 1) .. "|r Copy the new Guide folder into Interface\\AddOns, then /reload.") end
         return
     end
     if event == "PLAYER_ENTERING_WORLD" then
