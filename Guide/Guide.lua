@@ -70,7 +70,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.6.2"
+local VERSION = "0.6.3"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -775,9 +775,10 @@ end
 if WorldMapButton then
     local tip = CreateFrame("Frame", "GuideMapCursor", WorldMapButton)
     tip:SetFrameStrata("TOOLTIP")
-    tip:SetWidth(1); tip:SetHeight(1)
+    tip:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background" })
+    tip:SetBackdropColor(0, 0, 0, 0.75)
     local line = tip:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    line:SetPoint("TOPLEFT", tip, "TOPLEFT", 0, 0)
+    line:SetPoint("TOPLEFT", tip, "TOPLEFT", 4, -3)
     line:SetJustifyH("LEFT")
     local hint = tip:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hint:SetPoint("TOPLEFT", line, "BOTTOMLEFT", 0, -1)
@@ -795,13 +796,18 @@ if WorldMapButton then
         tip:SetPoint("TOPLEFT", WorldMapButton, "BOTTOMLEFT",
                      cx / s - WorldMapButton:GetLeft() + 16, cy / s - WorldMapButton:GetBottom() - 22)
         line:SetText(string.format("%.1f, %.1f", x, y))
+        tip:SetWidth(math.max(line:GetStringWidth(), hint:GetStringWidth()) + 8)
+        tip:SetHeight(line:GetStringHeight() + hint:GetStringHeight() + 7)
         tip:Show()
     end)
 
     -- Left-click on a zone map sets the arrow; anything else (right-click to
-    -- zoom out, clicks on continent maps) is the map's own.
-    local mapClick = WorldMapButton:GetScript("OnClick")
-    WorldMapButton:SetScript("OnClick", function(self, button, ...)
+    -- zoom out, clicks on continent maps) is the map's own. The map acts in
+    -- OnMouseUp (ProcessMapClick: a click east of Stormwind switches to
+    -- Elwynn), which runs before OnClick - so this takes OnMouseUp, and the
+    -- map never moves under a Guide click (mele's test of 0.6.2).
+    local mapUp = WorldMapButton:GetScript("OnMouseUp")
+    WorldMapButton:SetScript("OnMouseUp", function(self, button, ...)
         local zone = mapZoneName()
         local x, y = cursorOnMap()
         if button == "LeftButton" and zone and x then
@@ -809,7 +815,7 @@ if WorldMapButton then
             say(string.format("arrow set: %s %.1f, %.1f", zone, x, y))
             return
         end
-        if mapClick then return mapClick(self, button, ...) end
+        if mapUp then return mapUp(self, button, ...) end
     end)
 end
 
