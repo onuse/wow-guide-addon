@@ -70,7 +70,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.6.1"
+local VERSION = "0.6.2"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -746,6 +746,71 @@ local function way(msg)
         end
     end
     say("usage: /way [zone] x y [label] - e.g. /way Dustwallow Marsh 42.8 72.4 Flight master - or /way reset")
+end
+
+-- On the world map -----------------------------------------------------------
+-- Jonas, 2026-11-21: the cursor's coordinates beside the pointer, and a click
+-- on the map sets the arrow there. Zone maps only: a continent or world map
+-- has no zone coordinates to give /way. The click goes the same way as /way,
+-- so the server answers in chat when it cannot guide there (another
+-- continent, a zone with no map).
+
+local function mapZoneName()
+    local continent, zone = GetCurrentMapContinent(), GetCurrentMapZone()
+    if not continent or continent < 1 or not zone or zone < 1 then return nil end
+    return (select(zone, GetMapZones(continent)))
+end
+
+local function cursorOnMap()
+    local b = WorldMapButton
+    if not b or not b:IsVisible() or not MouseIsOver(b) then return nil end
+    local cx, cy = GetCursorPosition()
+    local s = b:GetEffectiveScale()
+    local x = (cx / s - b:GetLeft()) / b:GetWidth()
+    local y = (b:GetTop() - cy / s) / b:GetHeight()
+    if x < 0 or x > 1 or y < 0 or y > 1 then return nil end
+    return x * 100, y * 100
+end
+
+if WorldMapButton then
+    local tip = CreateFrame("Frame", "GuideMapCursor", WorldMapButton)
+    tip:SetFrameStrata("TOOLTIP")
+    tip:SetWidth(1); tip:SetHeight(1)
+    local line = tip:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    line:SetPoint("TOPLEFT", tip, "TOPLEFT", 0, 0)
+    line:SetJustifyH("LEFT")
+    local hint = tip:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("TOPLEFT", line, "BOTTOMLEFT", 0, -1)
+    hint:SetText("click: guide me here")
+
+    -- OnUpdate on a frame that stays shown with the map; the text is placed
+    -- just right of and below the pointer, so it never sits under the tip.
+    local driver = CreateFrame("Frame", nil, WorldMapButton)
+    driver:SetScript("OnUpdate", function()
+        local x, y = cursorOnMap()
+        if not x or not mapZoneName() then tip:Hide(); return end
+        local cx, cy = GetCursorPosition()
+        local s = WorldMapButton:GetEffectiveScale()
+        tip:ClearAllPoints()
+        tip:SetPoint("TOPLEFT", WorldMapButton, "BOTTOMLEFT",
+                     cx / s - WorldMapButton:GetLeft() + 16, cy / s - WorldMapButton:GetBottom() - 22)
+        line:SetText(string.format("%.1f, %.1f", x, y))
+        tip:Show()
+    end)
+
+    -- Left-click on a zone map sets the arrow; anything else (right-click to
+    -- zoom out, clicks on continent maps) is the map's own.
+    local mapClick = WorldMapButton:GetScript("OnClick")
+    WorldMapButton:SetScript("OnClick", function(self, button, ...)
+        local zone = mapZoneName()
+        local x, y = cursorOnMap()
+        if button == "LeftButton" and zone and x then
+            SendAddonMessage(PREFIX, string.format("W\t%s\t%.1f\t%.1f\t", zone, x, y), "WHISPER", UnitName("player"))
+            say(string.format("arrow set: %s %.1f, %.1f", zone, x, y))
+            return
+        end
+        if mapClick then return mapClick(self, button, ...) end
+    end)
 end
 
 SLASH_GUIDEWAY1 = "/gway"
