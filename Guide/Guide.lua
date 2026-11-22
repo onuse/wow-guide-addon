@@ -78,7 +78,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.8.1"
+local VERSION = "0.8.2"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -144,6 +144,13 @@ local function distText(yards)
         return string.format("%d yd", yards)
     end
     return string.format("%d m", math.floor(yards * 0.9144 + 0.5))
+end
+
+-- Tell the server the unit too (N m / N yd), so what it writes for this
+-- player - Point me to answers, Claude's replies - matches the menu choice.
+local function sendUnits()
+    local yards = GuideDB and GuideDB.meters == false
+    SendAddonMessage(PREFIX, "N\t" .. (yards and "yd" or "m"), "WHISPER", UnitName("player"))
 end
 local refreshPanel      -- defined with the panel below
 local dots, dotPool = {}, {}   -- minimap dots: {north, west} yards from you
@@ -497,7 +504,7 @@ local function menuItems()
         { text = "Show coordinates", checked = db().coordBox,
           keepShownOnClick = true, func = function() setCoordBox(not db().coordBox) end },
         { text = "Distances in meters", checked = db().meters,
-          keepShownOnClick = true, func = function() db().meters = not db().meters; refreshPanel() end },
+          keepShownOnClick = true, func = function() db().meters = not db().meters; sendUnits(); refreshPanel() end },
         { text = "Reset big arrow position", notCheckable = true, func = function()
             db().point = nil
             frame:ClearAllPoints(); frame:SetPoint("TOP", UIParent, "TOP", 0, -120)
@@ -750,6 +757,7 @@ end
 
 local function hello()
     SendAddonMessage(PREFIX, "H\t" .. VERSION, "WHISPER", UnitName("player"))
+    sendUnits()
 end
 
 handlers.Q = function() hello() end
