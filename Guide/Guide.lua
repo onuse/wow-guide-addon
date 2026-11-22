@@ -41,12 +41,17 @@ Wire format (prefix "Guide", tab-separated):
   U <version> <note> a newer Guide is out: the panel and chat say so
   Q                  say hello again
   M <text>           a one-off line for chat (a /way the server could not place)
+  F <query>          Point me to: the answers to this search follow
+  L <token> <label> <detail>
+                     one answer (token "-": not on this map)
   C <0|1>            1: this character is held at its level cap (60 until
                      Into the Breach): hide the XP bar and rested tick
 
 And back, to the server:
   W <zone> <x> <y> <label>   /way (zone empty = the one you are in)
   S                  /way reset, /guide stop
+  F <text>           Point me to: up to three answers come back as F + L
+  F #<token> <label> the answer picked; the arrow starts
   G <what>           /guide gather: ore or herbs, found by the server
   H <version>        hello, on entering the world and on Q. Whispered to
                      yourself, so it works whether Claude is online or not;
@@ -65,12 +70,15 @@ And back, to the server:
                        peacebloom), or ore, or herbs - everything your skill
                        can gather here. Works with Claude offline.
 /guide stop     stop guiding me
+/guide find <name>   "Point me to": a creature, NPC, trainer ("mining
+                     trainer"), object, item or quest; pick one of up to
+                     three answers (also in the minimap button's menu)
 ]]
 
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.6.3"
+local VERSION = "0.7.0"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -408,10 +416,77 @@ StaticPopupDialogs["GUIDE_CLEAR_NOTES"] = {
     timeout = 0, whileDead = true, hideOnEscape = true,
 }
 
+-- Point me to ------------------------------------------------------------
+-- Jonas, 2026-11-22: type a name - a creature, a rare, "mining trainer", an
+-- object, an item, a quest - and get an arrow without whispering Claude.
+-- The server answers with up to three places, each saying whether it is
+-- hostile, alive, dead or not loaded and how far; one click starts the arrow.
+
+local function findAsk(text)
+    text = string.gsub(text or "", "^%s+", "")
+    text = string.gsub(text, "%s+$", "")
+    if text == "" then return end
+    SendAddonMessage(PREFIX, "F\t" .. text, "WHISPER", UnitName("player"))
+end
+
+StaticPopupDialogs["GUIDE_FIND"] = {
+    text = "Point me to:\n|cff999999a creature, NPC, trainer, object, item or quest|r",
+    button1 = OKAY, button2 = CANCEL,
+    hasEditBox = 1, maxLetters = 60,
+    OnAccept = function(self) findAsk(self.editBox:GetText()) end,
+    EditBoxOnEnterPressed = function(self)
+        findAsk(self:GetText()); self:GetParent():Hide()
+    end,
+    EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
+    OnShow = function(self) self.editBox:SetText(""); self.editBox:SetFocus() end,
+    timeout = 0, whileDead = true, hideOnEscape = true,
+}
+
+local findFrame = CreateFrame("Frame", "GuideFind", UIParent)
+findFrame:SetWidth(420); findFrame:SetHeight(60)
+findFrame:SetPoint("TOP", UIParent, "TOP", 0, -180)
+findFrame:SetFrameStrata("DIALOG")
+findFrame:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 24,
+    insets = { left = 6, right = 6, top = 6, bottom = 6 } })
+findFrame:SetMovable(true); findFrame:EnableMouse(true); findFrame:RegisterForDrag("LeftButton")
+findFrame:SetScript("OnDragStart", findFrame.StartMoving)
+findFrame:SetScript("OnDragStop", findFrame.StopMovingOrSizing)
+findFrame:Hide()
+tinsert(UISpecialFrames, "GuideFind")
+local findTitle = findFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+findTitle:SetPoint("TOPLEFT", 14, -12); findTitle:SetPoint("RIGHT", -34, 0); findTitle:SetJustifyH("LEFT")
+local findClose = CreateFrame("Button", nil, findFrame, "UIPanelCloseButton")
+findClose:SetPoint("TOPRIGHT", -2, -2)
+
+local findRows = {}
+for i = 1, 3 do
+    local b = CreateFrame("Button", nil, findFrame)
+    b:SetHeight(36)
+    b:SetPoint("TOPLEFT", 12, -12 - 22 - (i - 1) * 40); b:SetPoint("RIGHT", -12, 0)
+    b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+    b.name = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    b.name:SetPoint("TOPLEFT", 4, -3); b.name:SetPoint("RIGHT", -4, 0); b.name:SetJustifyH("LEFT")
+    b.detail = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    b.detail:SetPoint("TOPLEFT", b.name, "BOTTOMLEFT", 0, -2); b.detail:SetPoint("RIGHT", -4, 0)
+    b.detail:SetJustifyH("LEFT"); b.detail:SetTextColor(0.7, 0.7, 0.7)
+    b:SetScript("OnClick", function(self)
+        if not self.token then return end
+        SendAddonMessage(PREFIX, "F\t#" .. self.token .. "\t" .. self.label, "WHISPER", UnitName("player"))
+        findFrame:Hide()
+    end)
+    b:Hide()
+    findRows[i] = b
+end
+local findCount = 0
+
+local function findOpen() StaticPopup_Show("GUIDE_FIND") end
+
 local function menuItems()
     return {
         { text = "Guide " .. VERSION, isTitle = true, notCheckable = true },
         { text = "Claude panel", notCheckable = true, func = togglePanel },
+        { text = "Point me to...", notCheckable = true, func = findOpen },
         -- the same as /way reset (Jonas, 2026-10-11: "an ability to Clear target")
         { text = "Stop guiding", notCheckable = true, disabled = not guiding(),
           func = function() SendAddonMessage(PREFIX, "S", "WHISPER", UnitName("player")) end },
@@ -645,6 +720,31 @@ handlers.M = function(f)
     say(f[2] or "")
 end
 
+-- "Point me to" answers: F <query> opens the list, L <token> <label> <detail>
+-- adds a row (token "-": not on this map, shown but not clickable).
+handlers.F = function(f)
+    findCount = 0
+    for _, b in ipairs(findRows) do b:Hide() end
+    findTitle:SetText("Point me to: |cffffffff" .. (f[2] or "") .. "|r")
+    findFrame:SetHeight(46)
+    findFrame:Show()
+end
+
+handlers.L = function(f)
+    if findCount >= #findRows then return end
+    findCount = findCount + 1
+    local b = findRows[findCount]
+    local here = f[2] and f[2] ~= "-"
+    b.token = here and f[2] or nil
+    b.label = f[3] or ""
+    b.name:SetText(here and b.label or ("|cff808080" .. b.label .. "|r"))
+    b.detail:SetText(f[4] or "")
+    if here then b:Enable() else b:Disable() end
+    b:Show()
+    findFrame:SetHeight(46 + findCount * 40)
+    findFrame:Show()
+end
+
 local function hello()
     SendAddonMessage(PREFIX, "H\t" .. VERSION, "WHISPER", UnitName("player"))
 end
@@ -832,6 +932,9 @@ SlashCmdList["GUIDE"] = function(arg)
         else
             SendAddonMessage(PREFIX, "G\t" .. what, "WHISPER", UnitName("player"))
         end
+    elseif string.match(arg, "^find") or string.match(arg, "^to%s") then
+        local what = string.match(arg, "^%S+%s*(.*)$")
+        if what == "" then findOpen() else findAsk(what) end
     elseif arg == "stop" then
         SendAddonMessage(PREFIX, "S", "WHISPER", UnitName("player"))
     elseif arg == "lock" then
