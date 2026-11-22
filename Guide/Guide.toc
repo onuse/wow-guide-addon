@@ -1,9 +1,11 @@
 ## Interface: 30300
 ## Title: Guide
-## Notes: Directions and notes from Claude: an arrow (compass outdoors, corridors in dungeons), a minimap compass, and a panel that keeps what Claude told you.
+## Notes: Directions and notes from Claude: an arrow (compass outdoors, corridors in dungeons), a minimap compass, and a panel that keeps what Claude told you, and maps of the old dungeons.
 ## Author: Claude (for Jonas's realm)
-## Version: 0.7.0
+## Version: 0.8.0
 ## SavedVariables: GuideDB
 ## OptionalDeps: TomTom
 
+DungeonMaps.lua
 Guide.lua
+DungeonMap.lua

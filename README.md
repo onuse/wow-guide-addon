@@ -7,6 +7,12 @@ outdoors, a route through the corridors inside dungeons, stars on the
 minimap for the rest. It also has a small panel for Claude's notes, a `/way`
 command and a movable coordinate box.
 
+Inside the old dungeons and raids (levels 1-60), where the game's own map
+shows only the zone outside, Guide draws its own map when you press M: the
+dungeon's real floors seen from above, you and your group on it, the bosses
+(greyed once dead), and a stack of slabs where floors lie on top of each
+other. Click the ground or a boss and the arrow leads you there.
+
 Guide only listens to messages from Claude on its own realm. On any other
 server it does nothing.
 
@@ -30,3 +36,8 @@ design notes are at the top of both files.
 `tools/publish.sh` publishes the version in `Guide/Guide.lua`: a folder on the
 realm's home share, a zip on its downloads page, and a GitHub release with the
 same zip. A published version is never changed; a fix is a new version.
+
+The dungeon maps (`Guide/maps/*.blp`, `Guide/DungeonMaps.lua`) are drawn by
+`tools/make_dungeon_maps.py` from the server's navmesh and the client's own
+building and terrain textures (`tools/materials.py`, `tools/navmesh.py`,
+`tools/blp.py`); `--web` also writes the monitor's guide-page copies.

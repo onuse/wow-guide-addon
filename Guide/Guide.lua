@@ -78,7 +78,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.7.0"
+local VERSION = "0.8.0"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 
@@ -642,13 +642,16 @@ dotTicker:SetScript("OnUpdate", function() if #dots > 0 then drawDots() end end)
 
 -- Messages ------------------------------------------------------------------
 
+local handlers = {}
+
+-- For DungeonMap.lua, loaded after this file.
+GuideCore = { handlers = handlers, say = say, rotate = rotate }
+
 local function split(msg)
     local t = {}
     for field in string.gmatch(msg .. "\t", "([^\t]*)\t") do table.insert(t, field) end
     return t
 end
-
-local handlers = {}
 
 handlers.A = function(f)
     local heading = tonumber(f[3])
@@ -862,6 +865,7 @@ local function mapZoneName()
 end
 
 local function cursorOnMap()
+    if GuideDungeonOverlay and GuideDungeonOverlay:IsShown() then return nil end   -- a dungeon map: its own clicks
     local b = WorldMapButton
     if not b or not b:IsVisible() or not MouseIsOver(b) then return nil end
     local cx, cy = GetCursorPosition()
@@ -935,6 +939,8 @@ SlashCmdList["GUIDE"] = function(arg)
     elseif string.match(arg, "^find") or string.match(arg, "^to%s") then
         local what = string.match(arg, "^%S+%s*(.*)$")
         if what == "" then findOpen() else findAsk(what) end
+    elseif arg == "map" then
+        say(GuideCore.mapStatus and GuideCore.mapStatus() or "no dungeon maps loaded.")
     elseif arg == "stop" then
         SendAddonMessage(PREFIX, "S", "WHISPER", UnitName("player"))
     elseif arg == "lock" then
