@@ -78,7 +78,7 @@ And back, to the server:
 local PREFIX, TRUSTED = "Guide", "Claude"
 -- Here, not only in the .toc: the client reads a .toc once, at start, so after
 -- a /reload over new files GetAddOnMetadata would still give the old version.
-local VERSION = "0.8.0"
+local VERSION = "0.8.1"
 local STALE = 5          -- seconds without an A message before guidance lapses
 local MAX_NOTES = 100
 

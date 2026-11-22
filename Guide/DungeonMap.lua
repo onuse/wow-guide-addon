@@ -148,15 +148,23 @@ end
 
 -- Markers -----------------------------------------------------------------
 
+-- The full-screen world map hides UIParent, and GameTooltip with it, so a
+-- tooltip on the map is WorldMapTooltip, as Blizzard's own map does (0.8.0
+-- showed no names on hover in Wow.exe; Jonas asked for party names, 0.8.1).
+local function TT()
+    return (WorldMapTooltip and WorldMapFrame:IsShown()) and WorldMapTooltip or GameTooltip
+end
+
 local function tip(fr, lines)
     fr:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        local tt = TT()
+        tt:SetOwner(self, "ANCHOR_RIGHT")
         for i, l in ipairs(lines(self)) do
-            if i == 1 then GameTooltip:SetText(l) else GameTooltip:AddLine(l, 1, 1, 1) end
+            if i == 1 then tt:SetText(l) else tt:AddLine(l, 1, 1, 1) end
         end
-        GameTooltip:Show()
+        tt:Show()
     end)
-    fr:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    fr:SetScript("OnLeave", function() TT():Hide() end)
 end
 
 local player = CreateFrame("Frame", nil, overlay)
@@ -195,6 +203,12 @@ local function bossButton(i)
     return b
 end
 
+local function classColor(c)
+    local t = CLASS[c] and RAID_CLASS_COLORS and RAID_CLASS_COLORS[CLASS[c]]
+    if t then return t.r, t.g, t.b end
+    return 1, 1, 1
+end
+
 local function partyDot(i)
     local d = partyDots[i]
     if d then return d end
@@ -206,17 +220,14 @@ local function partyDot(i)
     d.tex:SetAllPoints()
     d.tex:SetTexture("Interface\\WorldMap\\WorldMapPartyIcon")
     tip(d, function(self)
-        return { self.name, self.away and "|cff999999on another floor|r" or nil }
+        local r, g, b = classColor(self.class)
+        return { string.format("|cff%02x%02x%02x%s|r", r * 255, g * 255, b * 255, self.name or "?"),
+                 self.away and "|cff999999on another floor|r" or nil }
     end)
     partyDots[i] = d
     return d
 end
 
-local function classColor(c)
-    local t = CLASS[c] and RAID_CLASS_COLORS and RAID_CLASS_COLORS[CLASS[c]]
-    if t then return t.r, t.g, t.b end
-    return 1, 1, 1
-end
 
 -- The layer stack ---------------------------------------------------------
 -- One slab per floor, top floor at the top: the floor's own outline (30 x
@@ -309,14 +320,15 @@ local function buildStack(m, wing)
         s.floor = fi
         s:SetScript("OnEnter", function(self)
             if not pinned then peek = self.floor end
-            GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-            GameTooltip:SetText(self.floor == myFloor and "Your floor" or "Another floor")
-            GameTooltip:AddLine(self.floor == myFloor and "You are here." or "|cff20ff20Click|r to keep it on the map.", 1, 1, 1)
-            GameTooltip:Show()
+            local tt = TT()
+            tt:SetOwner(self, "ANCHOR_LEFT")
+            tt:SetText(self.floor == myFloor and "Your floor" or "Another floor")
+            tt:AddLine(self.floor == myFloor and "You are here." or "|cff20ff20Click|r to keep it on the map.", 1, 1, 1)
+            tt:Show()
         end)
         s:SetScript("OnLeave", function()
             if not pinned then peek = nil end
-            GameTooltip:Hide()
+            TT():Hide()
         end)
         s:SetScript("OnClick", function(self)
             if self.floor == myFloor then pinned, peek = false, nil
@@ -398,7 +410,7 @@ local function refresh()
     -- group
     for i, p in ipairs(group) do
         local d = partyDot(i)
-        d.name, d.away = p.name, p.floor ~= want
+        d.name, d.class, d.away = p.name, p.class, p.floor ~= want
         d.tex:SetVertexColor(classColor(p.class))
         d:SetAlpha(d.away and 0.35 or 1)
         place(d, p.x, p.y)
