@@ -26,7 +26,7 @@ fi
 dest=$SHARE/Guide-$ver
 [ -e "$dest" ] && { echo "$dest exists - a published version is never changed; bump the version"; exit 1; }
 mkdir -p "$dest/Guide"
-cp "$src"/* "$dest/Guide/"
+cp -r "$src"/* "$dest/Guide/"     # -r: maps/ since 0.8.0
 sudo -n chown -R nobody:nogroup "$dest"
 sudo -n chmod -R a+rwX "$dest"
 zip=/mnt/wow-data2/downloads/addons/Guide-$ver.zip
