@@ -42,9 +42,12 @@ else
   gh release create "v$ver" "$zip" --title "Guide $ver" --notes "Unzip into World of Warcraft/Interface/AddOns/." >/dev/null
   echo "published https://github.com/onuse/wow-guide-addon/releases/tag/v$ver"
 fi
-# The Rust client's signed add-on catalog (wow-server-monitor ops/addon_catalog,
-# 2026-11-25): clients that manage add-ons update Guide from there. Earlier
-# releases' trees stay adoptable, so unmarked copies players have are taken over.
-python3 /mnt/wow-data2/wow-server-monitor/ops/addon_catalog/addon_catalog.py publish authentic "$zip" \
-  --name Guide --version "$ver" --title Guide --recommended --first-party \
-  --source https://github.com/onuse/wow-guide-addon --adopt /mnt/wow-data2/downloads/addons/Guide-*.zip
+# The Rust clients' signed add-on catalogs (wow-server-monitor ops/addon_catalog,
+# 2026-11-25), one per client family; the families may diverge later, so set
+# GUIDE_FAMILIES to publish to fewer. Earlier releases' trees stay adoptable,
+# so unmarked copies players have are taken over.
+for fam in ${GUIDE_FAMILIES:-authentic platinum}; do
+  python3 /mnt/wow-data2/wow-server-monitor/ops/addon_catalog/addon_catalog.py publish "$fam" "$zip" \
+    --name Guide --version "$ver" --title Guide --first-party \
+    --source https://github.com/onuse/wow-guide-addon --adopt /mnt/wow-data2/downloads/addons/Guide-*.zip
+done
